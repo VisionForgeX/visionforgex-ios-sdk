@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'VisionForgeX'
-  s.version          = '1.0.0'
+  s.version          = '1.1.0'
   s.summary          = 'VisionForgeX SDK for iOS: Google Ad Manager demand with every decision made on the platform.'
   s.homepage         = 'https://apps.visionforgex.com'
   s.license          = { :type => 'MIT', :file => 'LICENSE' }

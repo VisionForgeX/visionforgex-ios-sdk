@@ -58,6 +58,11 @@ final class FakeEnv: SlotEnv {
     func keyValues(_ placement: Placement) -> [String: String] { ["vfx_pl": placement.name] }
     func event(_ type: String, _ p: Placement, _ fields: [String: Any?]) { events.append((type, fields)) }
     func onFullScreenClosed() {}
+    /// Prebid: the test answers when it likes (nil: not bid for).
+    var prebidAsk: ((Placement, @escaping ([String: String]) -> Void) -> Void)?
+    func prebid(_ placement: Placement, _ done: @escaping ([String: String]) -> Void) {
+        if let ask = prebidAsk { ask(placement, done) } else { done([:]) }
+    }
     func advance(_ ms: Int64) { t += ms; runDue() }
     private func runDue() {
         if running { return }

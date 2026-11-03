@@ -20,6 +20,7 @@ public final class VfxBannerView: UIView, BannerListener {
     private var refreshItem: DispatchWorkItem?
     private var retryItem: DispatchWorkItem?
     private var requestedAt: Int64 = 0
+    private var seq = 0   // a load that began before a stop or a newer load is forgotten when its bids arrive
 
     public init(placement: String = "") {
         self.placement = placement
@@ -52,6 +53,7 @@ public final class VfxBannerView: UIView, BannerListener {
     }
 
     private func stop() {
+        seq += 1
         refreshItem?.cancel(); retryItem?.cancel()
         banner?.destroy(); banner = nil
         started = false; loadedOnce = false; attempt = 0
@@ -72,9 +74,17 @@ public final class VfxBannerView: UIView, BannerListener {
             addSubview(b.view)
             NSLayoutConstraint.activate([b.view.centerXAnchor.constraint(equalTo: centerXAnchor), b.view.topAnchor.constraint(equalTo: topAnchor)])
         }
-        requestedAt = s.now()
-        s.event("req", p, ["tier": 0])
-        banner?.load(EngineRequest(keyValues: s.keyValues(p), collapsible: loadedOnce ? "" : p.collapsible))
+        seq += 1
+        let mine = seq
+        let go: ([String: String]) -> Void = { [weak self] bid in
+            guard let self = self, mine == self.seq, let s = self.sdk() else { return }
+            self.requestedAt = s.now()
+            s.event("req", p, ["tier": 0])
+            var kv = s.keyValues(p)
+            for (k, v) in bid { kv[k] = v }
+            self.banner?.load(EngineRequest(keyValues: kv, collapsible: self.loadedOnce ? "" : p.collapsible))
+        }
+        if p.prebidImp.isEmpty { go([:]) } else { s.prebid(p, go) }   // bids first, when the platform says so
     }
 
     // MARK: BannerListener (Google's callbacks arrive on the main thread)

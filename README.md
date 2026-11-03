@@ -78,5 +78,5 @@ VisionForgeX.revenueListener = { r in /* r.valueMicros, r.currency, r.precision 
 
 ## Status
 
-Version 1.0.0 is written against Google Mobile Ads 11.x and has not yet been through its first CI build.
+Version 1.1.0 is written against Google Mobile Ads 11.x and has not yet been through its first CI build.
 What stays private is the platform; this repository holds only what runs in the app.

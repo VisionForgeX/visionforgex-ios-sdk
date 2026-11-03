@@ -23,9 +23,14 @@ public enum Http {
     public static func get(_ url: String, etag: String?) -> HttpResult { request(url, method: "GET", body: nil, etag: etag) }
     public static func postJson(_ url: String, _ json: String) -> HttpResult { request(url, method: "POST", body: json.data(using: .utf8), etag: nil) }
 
-    private static func request(_ url: String, method: String, body: Data?, etag: String?) -> HttpResult {
+    /// For the Prebid auction: its own wait (the settings') instead of the usual ten seconds.
+    public static func postJsonFast(_ url: String, _ json: String, timeoutMs: Int) -> HttpResult {
+        request(url, method: "POST", body: json.data(using: .utf8), etag: nil, timeoutSec: max(0.1, Double(timeoutMs) / 1000.0))
+    }
+
+    private static func request(_ url: String, method: String, body: Data?, etag: String?, timeoutSec: Double = 10) -> HttpResult {
         guard let u = URL(string: url) else { return HttpResult(code: 0, body: "", etag: nil) }
-        var r = URLRequest(url: u, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10)
+        var r = URLRequest(url: u, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeoutSec)
         r.httpMethod = method
         r.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         r.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -40,7 +45,7 @@ public enum Http {
             sem.signal()
         }
         task.resume()
-        if sem.wait(timeout: .now() + 15) == .timedOut { task.cancel() }
+        if sem.wait(timeout: .now() + timeoutSec + 5) == .timedOut { task.cancel() }
         return result
     }
 }

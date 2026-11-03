@@ -15,6 +15,12 @@ public protocol SlotEnv: AnyObject {
     func event(_ type: String, _ p: Placement, _ fields: [String: Any?])
     var fullScreenShowing: Bool { get set }
     func onFullScreenClosed()
+    /// Asks for bids (Prebid) before Google is asked; `done` gets the winner's key-values, or none. Answers exactly once.
+    func prebid(_ placement: Placement, _ done: @escaping ([String: String]) -> Void)
+}
+
+public extension SlotEnv {
+    func prebid(_ placement: Placement, _ done: @escaping ([String: String]) -> Void) { done([:]) }
 }
 
 /// One full-screen placement: keeps one ad loaded (when the platform says preload), asks through the floor
@@ -53,12 +59,20 @@ public final class FullScreenSlot {
         if fresh { if let t = retryToken { env.cancel(t) }; retryToken = nil; attempt = 0 }
         if attempt > p.retry.maxAttempts { return }
         loadId += 1
-        loadTier(p, 0, loadId)
+        let id = loadId
+        if p.prebidImp.isEmpty { loadTier(p, 0, id, [:]); return }
+        loading = true
+        state = "bidding"
+        env.prebid(p) { [weak self] bid in
+            guard let self = self, id == self.loadId else { return }   // reset meanwhile: the old auction is forgotten
+            self.loadTier(p, 0, id, bid)
+        }
     }
 
-    private func loadTier(_ p: Placement, _ tier: Int, _ id: Int) {
+    private func loadTier(_ p: Placement, _ tier: Int, _ id: Int, _ bid: [String: String]) {
         let tiers = p.floors.tiers
         var kv = env.keyValues(p)
+        for (k, v) in bid { kv[k] = v }
         if tier < tiers.count { kv[p.floors.key] = tiers[tier] }
         loading = true
         state = "loading"
@@ -71,7 +85,7 @@ public final class FullScreenSlot {
                 guard let self = self, !answered, id == self.loadId else { return }
                 answered = true
                 self.env.event("nofill", p, ["tier": tierNo, "ms": self.env.now() - started, "err": "timeout"])
-                self.loadTier(p, tier + 1, id)
+                self.loadTier(p, tier + 1, id, bid)
             }
         }
         env.engine.loadFullScreen(format: p.format, unit: p.unit, request: EngineRequest(keyValues: kv)) { [weak self] result in
@@ -97,7 +111,7 @@ public final class FullScreenSlot {
                     if let t = self.timeoutToken { self.env.cancel(t) }; self.timeoutToken = nil
                     self.lastError = "\(err.code) \(err.message)"
                     self.env.event("nofill", p, ["tier": tierNo, "ms": self.env.now() - started, "err": String(err.code)])
-                    if tier < tiers.count { self.loadTier(p, tier + 1, id); return }
+                    if tier < tiers.count { self.loadTier(p, tier + 1, id, bid); return }
                     self.loading = false
                     self.scheduleRetry(p)
                 }

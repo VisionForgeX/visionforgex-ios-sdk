@@ -126,4 +126,55 @@ final class FullScreenSlotTests: XCTestCase {
         s.show(presenter: nil, callbacks: VfxShowCallbacks(onNotShown: { why = $0 }))
         XCTAssertEqual(why, "no_presenter")
     }
+
+    private func plBid(floors: [String] = []) -> Placement {
+        var p = pl(floors: floors); p.prebidImp = "imp-lv"; return p
+    }
+
+    func testBidsAreAskedForFirstAndTheWinnerGoesToGoogleOnEveryTier() {
+        env.cfg = config(plBid(floors: ["300", "150"]))
+        var answer: (([String: String]) -> Void)?
+        env.prebidAsk = { _, done in answer = done }
+        let s = FullScreenSlot(name: "lv", env: env)
+        s.load()
+        XCTAssertEqual(engine.requests.count, 0, "Google is not asked while the bids are awaited")
+        XCTAssertEqual(s.state, "bidding")
+        s.load()   // a second load() meanwhile asks for nothing more
+        answer!(["hb_pb": "1.20", "hb_bidder": "appnexus"])
+        XCTAssertEqual(engine.requests[0].kv, ["vfx_pl": "lv", "vfx_fl": "300", "hb_pb": "1.20", "hb_bidder": "appnexus"])
+        engine.requests[0].cb(.failure(EngineError(code: 3, message: "no fill")))
+        XCTAssertEqual(engine.requests[1].kv["hb_pb"], "1.20", "the next floor tier carries the bid too")
+        XCTAssertEqual(engine.requests[1].kv["vfx_fl"], "150")
+        env.advance(2600)
+        XCTAssertEqual(engine.requests[2].kv["hb_pb"], "1.20", "…and so does the request without a floor")
+        XCTAssertNil(engine.requests[2].kv["vfx_fl"])
+    }
+
+    func testNoBidsMeansGoogleAloneAsBefore() {
+        env.cfg = config(plBid())
+        env.prebidAsk = { _, done in done([:]) }
+        FullScreenSlot(name: "lv", env: env).load()
+        XCTAssertEqual(engine.requests[0].kv, ["vfx_pl": "lv"])
+    }
+
+    func testAPlacementNotBidForNeverAsksPrebid() {
+        var asked = 0
+        env.prebidAsk = { _, done in asked += 1; done([:]) }
+        FullScreenSlot(name: "lv", env: env).load()   // setUp's placement has no prebidImp
+        XCTAssertEqual(asked, 0)
+        XCTAssertEqual(engine.requests.count, 1)
+    }
+
+    func testAResetWhileBiddingDropsTheLateAnswer() {
+        env.cfg = config(plBid())
+        var answer: (([String: String]) -> Void)?
+        env.prebidAsk = { _, done in answer = done }
+        let s = FullScreenSlot(name: "lv", env: env)
+        s.load(); s.reset()
+        answer!(["hb_pb": "9.90"])
+        XCTAssertEqual(engine.requests.count, 0, "settings changed meanwhile: the old auction is forgotten")
+        XCTAssertEqual(s.state, "idle")
+        s.load(); answer!(["hb_pb": "1.00"])
+        XCTAssertEqual(engine.requests[0].kv["hb_pb"], "1.00", "a new load works")
+    }
 }

@@ -32,6 +32,18 @@ public struct Placement {
     public var collapsible: String
     public var template: String
     public var autoShow: Bool
+    /// The stored imp to ask a Prebid Server for bids with before Google is asked; empty: not bid for (PROTOCOL.md, "prebid").
+    public var prebidImp: String = ""
+}
+
+/// Where and how to ask for bids (PROTOCOL.md, "prebid"); absent unless the platform turned it on for this app.
+public struct PrebidSettings: Equatable {
+    public var url: String, request: String
+    public var timeoutMs: Int64
+    public var breakerFailures: Int, breakerPauseSec: Int
+    public init(url: String, request: String, timeoutMs: Int64, breakerFailures: Int, breakerPauseSec: Int) {
+        self.url = url; self.request = request; self.timeoutMs = timeoutMs; self.breakerFailures = breakerFailures; self.breakerPauseSec = breakerPauseSec
+    }
 }
 
 /// The settings from the platform (PROTOCOL.md section 1), checked and kept within safe bounds.
@@ -55,6 +67,7 @@ public struct Config {
     public var kv: [String: String]
     public var ab: String
     public var placements: [String: Placement]
+    public var prebid: PrebidSettings? = nil
 }
 
 private func clamp(_ v: Int, _ lo: Int, _ hi: Int) -> Int { min(max(v, lo), hi) }
@@ -106,7 +119,19 @@ public enum ConfigParser {
             flushSec: clamp(events.int("flushSec", 30), 5, 3600),
             kv: kv,
             ab: matches(ab, "^e[0-9]{1,4}:[ab]$") ? ab : "",
-            placements: pls)
+            placements: pls,
+            prebid: prebid(o["prebid"] as? [String: Any]))
+    }
+
+    private static let storedId = "^[A-Za-z0-9_.-]{1,80}\\z"
+    /// The Prebid block, or nil when it is absent or not usable (no address, no stored request): then nothing is bid for.
+    private static func prebid(_ b: [String: Any]?) -> PrebidSettings? {
+        guard let b = b else { return nil }
+        let url = b.str("url"), request = b.str("request")
+        guard url.hasPrefix("https://") || url.hasPrefix("http://"), matches(request, storedId) else { return nil }
+        let br = b.obj("breaker")
+        return PrebidSettings(url: url, request: request, timeoutMs: Int64(clamp(Int(b.int64("timeoutMs", 800)), 100, 3000)),
+                              breakerFailures: clamp(br.int("failures", 3), 1, 20), breakerPauseSec: clamp(br.int("pauseSec", 600), 30, 3600))
     }
 
     private static func placement(_ name: String, _ f: VfxFormat, _ p: [String: Any]) -> Placement {
@@ -138,7 +163,8 @@ public enum ConfigParser {
             floors: Floors(key: key.trimmingCharacters(in: .whitespaces).isEmpty ? "vfx_fl" : key, tiers: tiers, timeoutMs: Int64(clamp(Int(fl.int64("timeoutMs", 2500)), 500, 10000))),
             collapsible: (col == "top" || col == "bottom") ? col : "",
             template: p.str("template") == "small" ? "small" : "medium",
-            autoShow: f == .appOpen && p.bool("autoShow", false))
+            autoShow: f == .appOpen && p.bool("autoShow", false),
+            prebidImp: (f == .banner || f == .interstitial) && matches(p.obj("prebid").str("imp"), storedId) ? p.obj("prebid").str("imp") : "")
     }
 }
 

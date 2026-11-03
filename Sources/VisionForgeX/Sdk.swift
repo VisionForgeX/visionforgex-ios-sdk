@@ -224,6 +224,43 @@ final class Sdk: SlotEnv {
     }
     func onFullScreenClosed() { skipNextAppOpen = false }
 
+    // MARK: Prebid (bids before Google; PROTOCOL.md, "prebid")
+
+    private lazy var prebidRunner = PrebidRunner(
+        post: { [unowned self] d, b in self.post(delayMs: d, b) }, cancel: { [unowned self] t in self.cancel(t) }, now: { [unowned self] in self.clock() },
+        io: { [unowned self] b in self.io.async(execute: b) },
+        send: { u, body, tmo in Http.postJsonFast(u, body, timeoutMs: tmo) },
+        device: { Sdk.prebidDevice() }, signals: { Sdk.prebidSignals() },
+        appVersion: { (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "" }, sdkVersion: vfxVersion,
+        event: { [unowned self] p, r, why in
+            var f: [String: Any?] = ["r": r.result, "ms": r.ms]
+            if r.result == "bid" { f["v"] = r.valueMicros }
+            if !why.isEmpty { f["why"] = why }
+            self.event("pb", p, f)
+        })
+
+    func prebid(_ placement: Placement, _ done: @escaping ([String: String]) -> Void) {
+        if let c = cfg { prebidRunner.run(c, placement, done) } else { done([:]) }
+    }
+
+    private static func prebidDevice() -> Prebid.Device {
+        var sys = utsname(); uname(&sys)
+        let machine = withUnsafePointer(to: &sys.machine) { $0.withMemoryRebound(to: CChar.self, capacity: 1) { String(cString: $0) } }
+        let scale = UIScreen.main.scale, size = UIScreen.main.bounds.size
+        return Prebid.Device(os: "ios", osv: UIDevice.current.systemVersion, make: "Apple", model: String(machine.prefix(40)),
+                             tablet: UIDevice.current.userInterfaceIdiom == .pad, language: Locale.current.languageCode ?? "en",
+                             w: Int(size.width * scale), h: Int(size.height * scale), pxratio: Double(scale), ua: Http.userAgent)
+    }
+
+    /// What Google's consent form left in the app's UserDefaults under the IAB's standard keys.
+    private static func prebidSignals() -> Prebid.Signals {
+        let d = UserDefaults.standard
+        let gdpr = d.object(forKey: "IABTCF_gdprApplies") as? NSNumber
+        return Prebid.Signals(gdprApplies: gdpr.map { $0.intValue == 1 }, tcString: d.string(forKey: "IABTCF_TCString") ?? "",
+                              usPrivacy: d.string(forKey: "IABUSPrivacy_String") ?? "", gpp: d.string(forKey: "IABGPP_HDR_GppString") ?? "",
+                              gppSid: d.string(forKey: "IABGPP_GppSID") ?? "")
+    }
+
     func slot(_ name: String) -> FullScreenSlot {
         if let s = slots[name] { return s }
         let s = FullScreenSlot(name: name, env: self); slots[name] = s; return s

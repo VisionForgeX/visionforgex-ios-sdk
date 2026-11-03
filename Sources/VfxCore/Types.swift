@@ -1,7 +1,7 @@
 import Foundation
 
 /// This SDK's version.
-public let vfxVersion = "1.0.0"
+public let vfxVersion = "1.1.0"
 
 /// The ad formats, as the platform names them.
 public enum VfxFormat: String {
