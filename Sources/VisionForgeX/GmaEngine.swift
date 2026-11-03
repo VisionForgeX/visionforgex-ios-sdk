@@ -1,6 +1,8 @@
 import UIKit
 import GoogleMobileAds
+#if canImport(VfxCore)
 import VfxCore
+#endif
 
 /// The engine on Google Mobile Ads (iOS 11.x API, Ad Manager requests). Apps never touch it.
 final class GmaEngine: NSObject, AdEngine {

@@ -1,5 +1,7 @@
 import UIKit
+#if canImport(VfxCore)
 import VfxCore
+#endif
 
 /// The SDK's state, on the main thread: the settings (cached, refreshed when the app comes back after their
 /// time is up), consent, the session, the slots, the events.

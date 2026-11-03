@@ -1,6 +1,7 @@
 # Changelog
 
 ## 1.0.0 (not released)
+- Also as a CocoaPod (`VisionForgeX.podspec`), which the Flutter and React Native wrappers use.
 First version for iOS, matching the Android SDK 1.0.x's protocol (docs/PROTOCOL.md version 1).
 - Settings from the platform, cached, refreshed by their time; consent through Google's User Messaging Platform.
 - Interstitial, rewarded, rewarded interstitial and app open ads: preloaded, expiring before Google's limits, floors asked highest first, retried after a growing wait, paced by the platform's caps.

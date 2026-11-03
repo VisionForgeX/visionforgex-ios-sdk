@@ -1,5 +1,7 @@
 import UIKit
+#if canImport(VfxCore)
 import VfxCore
+#endif
 
 /// What the Sdk needs from the ad engine beyond full-screen ads. Only the Google engine exists; the
 /// protocol keeps a second engine (Google's next SDK) from touching the rest.

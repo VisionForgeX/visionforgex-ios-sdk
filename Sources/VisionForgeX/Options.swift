@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(VfxCore)
 @_exported import VfxCore
+#endif
 
 /// Options for `VisionForgeX.initialize`. Everything that decides revenue comes from the platform;
 /// these are only for building and testing the app.

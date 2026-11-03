@@ -1,5 +1,7 @@
 import UIKit
+#if canImport(VfxCore)
 @_exported import VfxCore
+#endif
 
 /// The VisionForgeX SDK. Start it once, as early as you can (application(_:didFinishLaunchingWithOptions:) or your App's init):
 ///

@@ -1,5 +1,7 @@
 import UIKit
+#if canImport(VfxCore)
 import VfxCore
+#endif
 
 /// A banner for one placement: adaptive to the width it is given (Google's anchored adaptive size), refreshed as the
 /// platform says only while at least half of it is on screen and the app is in front, collapsible when the platform
