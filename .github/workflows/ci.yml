@@ -1,0 +1,21 @@
+# Builds and tests on GitHub's own Macs, because the SDK needs Xcode. Open the "Actions" tab of this repository to see the result.
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  core-tests:
+    name: Core logic tests (macOS)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test VfxCore
+        run: xcodebuild -scheme VfxCore -destination 'platform=macOS' test | tail -40
+  ios-build:
+    name: Build for iOS
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the SDK for iOS
+        run: xcodebuild -scheme VisionForgeX -destination 'generic/platform=iOS' -skipPackagePluginValidation build | tail -40
