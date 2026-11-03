@@ -45,6 +45,9 @@ public struct VfxRevenue {
     public let currency: String
     public let precision: String
     public let source: String?
+    public init(placement: String, format: VfxFormat, valueMicros: Int64, currency: String, precision: String, source: String?) {
+        self.placement = placement; self.format = format; self.valueMicros = valueMicros; self.currency = currency; self.precision = precision; self.source = source
+    }
 }
 
 /// What happened to one show() call. Every closure is optional.
