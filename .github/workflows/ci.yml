@@ -10,9 +10,11 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
-      - name: Test VfxCore
-        shell: bash
-        run: swift test 2>&1 | tail -60 ; test ${PIPESTATUS[0]} -eq 0
+      - name: Test the core (runs the XCTest suite on an iPhone simulator, the platform the SDK is for)
+        run: |
+          set -o pipefail
+          xcodebuild -list 2>&1 | tail -15
+          xcodebuild -scheme VisionForgeX-Package -destination 'platform=iOS Simulator,name=iPhone 15' -skipPackagePluginValidation test 2>&1 | tail -80
   ios-build:
     name: Build for iOS
     runs-on: macos-14
