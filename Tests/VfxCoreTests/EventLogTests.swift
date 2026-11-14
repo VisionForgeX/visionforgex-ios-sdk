@@ -6,7 +6,7 @@ final class EventLogTests: XCTestCase {
     private var sent: [(String, [String: Any])] = []
     private var code = 200
     private var dir: URL!
-    private let header = EventLog.Header(key: "vfx_k", install: "inst", session: "sess", sdk: "1.0.0", appVersion: "2.3.1", os: "17.5", device: "iPhone15,2", country: "PK", ab: "e1:b", sample: 1.0)
+    private let header = EventLog.Header(key: "vfx_k", install: "inst", session: "sess", sdk: "1.0.0", appVersion: "2.3.1", os: "17.5", device: "iPhone15,2", country: "PK", ab: "e1:b", sample: 1.0, engine: "gma-ios-13")
 
     override func setUp() {
         dir = FileManager.default.temporaryDirectory.appendingPathComponent("vfx-ev-" + UUID().uuidString)
@@ -32,7 +32,15 @@ final class EventLogTests: XCTestCase {
         XCTAssertEqual(b["k"] as? String, "vfx_k"); XCTAssertEqual(b["p"] as? String, "ios"); XCTAssertEqual(b["c"] as? String, "PK"); XCTAssertEqual(b["ab"] as? String, "e1:b")
         let e = b["e"] as! [[String: Any]]
         XCTAssertEqual(e.map { $0["t"] as? String }, ["ses", "req"])
+        XCTAssertEqual(b["eng"] as? String, "gma-ios-13", "which Google SDK the app runs")
         XCTAssertEqual(l.size(), 0)
+    }
+
+    func testAnEngineWithNoNameSendsNoEngineField() {
+        let l = log()
+        l.add("req", ["pl": "lv", "f": "banner"])
+        l.flush(url: "https://x/e", header: EventLog.Header(key: "vfx_k", install: "inst", session: "sess", sdk: "1.0.0", appVersion: "2.3.1", os: "17.5", device: "iPhone15,2", country: "PK", ab: "", sample: 1.0))
+        XCTAssertNil(sent.last!.1["eng"])
     }
 
     func testOutOfTheSampleOnlySessionsAndRevenueGo() {

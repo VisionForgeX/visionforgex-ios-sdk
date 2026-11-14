@@ -7,7 +7,10 @@ public final class EventLog {
     public struct Header {
         public var key, install, session, sdk, appVersion, os, device, country, ab: String
         public var sample: Double
-        public init(key: String, install: String, session: String, sdk: String, appVersion: String, os: String, device: String, country: String, ab: String, sample: Double) {
+        /// The Google SDK under the app, e.g. "gma-ios-13" (PROTOCOL.md section 2, `eng`); "" sends nothing.
+        public var engine: String = ""
+        public init(key: String, install: String, session: String, sdk: String, appVersion: String, os: String, device: String, country: String, ab: String, sample: Double, engine: String = "") {
+            self.engine = engine
             self.key = key; self.install = install; self.session = session; self.sdk = sdk; self.appVersion = appVersion; self.os = os; self.device = device; self.country = country; self.ab = ab; self.sample = sample
         }
     }
@@ -69,8 +72,9 @@ public final class EventLog {
         io { [weak self] in
             guard let self = self else { return }
             var accepted = 0
-            let body: [String: Any] = ["k": header.key, "i": header.install, "s": header.session, "sv": header.sdk, "p": self.platform,
+            var body: [String: Any] = ["k": header.key, "i": header.install, "s": header.session, "sv": header.sdk, "p": self.platform,
                 "av": header.appVersion, "os": header.os, "dev": header.device, "c": header.country, "ab": header.ab, "sr": header.sample, "e": batch]
+            if !header.engine.isEmpty { body["eng"] = header.engine }
             if let d = try? JSONSerialization.data(withJSONObject: body), let json = String(data: d, encoding: .utf8) {
                 let r = self.send(url, json)
                 if r.code >= 200 && r.code <= 499 {

@@ -11,7 +11,7 @@ let package = Package(
         .library(name: "VfxCore", targets: ["VfxCore"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/googleads/swift-package-manager-google-mobile-ads.git", .upToNextMajor(from: "11.13.0")),
+        .package(url: "https://github.com/googleads/swift-package-manager-google-mobile-ads.git", .upToNextMajor(from: "13.12.0")),
         .package(url: "https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git", .upToNextMajor(from: "2.7.0")),
     ],
     targets: [

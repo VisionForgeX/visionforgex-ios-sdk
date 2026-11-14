@@ -4,39 +4,44 @@ import GoogleMobileAds
 import VfxCore
 #endif
 
-/// The engine on Google Mobile Ads (iOS 11.x API, Ad Manager requests). Apps never touch it.
+/// The engine on Google Mobile Ads for iOS 13.x (Ad Manager requests). Apps never touch it.
+///
+/// Google has no Next-Gen SDK for iOS: its iOS SDK keeps one line with a major version each February. 11.x was
+/// deprecated on 4 Feb 2026 and stops serving in Q2 2027; 12.x is supported until Q1 2027 (sunset Q2 2028); 13.x
+/// until Q1 2028 (sunset Q2 2029). SDK 1.2.0 moved from 11.x to 13.x (Google's Swift names since 12.0).
 final class GmaEngine: NSObject, AdEngine {
-    let name = "gma-ios-11"
+    let name = "gma-ios-13"
     let consent: ConsentEngine = UmpConsent()
 
     func initialize(settings: EngineSettings, done: @escaping () -> Void) {
         apply(settings: settings)
-        GADMobileAds.sharedInstance().start { _ in done() }
+        MobileAds.shared.start { _ in done() }
     }
 
     func apply(settings: EngineSettings) {
-        let rc = GADMobileAds.sharedInstance().requestConfiguration
-        rc.tagForChildDirectedTreatment = settings.childDirected ? NSNumber(value: true) : nil
-        rc.tagForUnderAgeOfConsent = settings.underAge ? NSNumber(value: true) : nil
+        let rc = MobileAds.shared.requestConfiguration
+        // one setting since 11.x: CHILD for an app directed at children (COPPA), TEEN under the age of consent (GDPR)
+        rc.ageRestrictedTreatment = settings.childDirected ? .child : (settings.underAge ? .teen : .unspecified)
         switch settings.maxRating {
         case "G": rc.maxAdContentRating = GADMaxAdContentRating.general
         case "PG": rc.maxAdContentRating = GADMaxAdContentRating.parentalGuidance
         case "T": rc.maxAdContentRating = GADMaxAdContentRating.teen
         case "MA": rc.maxAdContentRating = GADMaxAdContentRating.matureAudience
-        default: break
+        default: rc.maxAdContentRating = nil
         }
         rc.testDeviceIdentifiers = settings.testDeviceIds
     }
 
-    func setMuted(_ muted: Bool) { GADMobileAds.sharedInstance().applicationMuted = muted }
+    func setMuted(_ muted: Bool) { MobileAds.shared.isApplicationMuted = muted }
 
-    func openInspector(from vc: UIViewController) { GADMobileAds.sharedInstance().presentAdInspector(from: vc) { _ in } }
+    func openInspector(from vc: UIViewController) { MobileAds.shared.presentAdInspector(from: vc) { _ in } }
 
-    static func request(_ r: EngineRequest) -> GAMRequest {
-        let q = GAMRequest()
+    static func request(_ r: EngineRequest) -> AdManagerRequest {
+        let q = AdManagerRequest()
         q.customTargeting = r.keyValues
+        q.requestAgent = "VisionForgeX"
         if !r.collapsible.isEmpty {
-            let extras = GADExtras()
+            let extras = Extras()
             extras.additionalParameters = ["collapsible": r.collapsible]
             q.register(extras)
         }
@@ -52,19 +57,19 @@ final class GmaEngine: NSObject, AdEngine {
         DispatchQueue.main.async {
             switch format {
             case .interstitial:
-                GAMInterstitialAd.load(withAdManagerAdUnitID: unit, request: req) { ad, error in
+                AdManagerInterstitialAd.load(with: unit, request: req) { ad, error in
                     if let ad = ad { completion(.success(GmaFullScreen.interstitial(ad))) } else { completion(fail(error)) }
                 }
             case .rewarded:
-                GADRewardedAd.load(withAdUnitID: unit, request: req) { ad, error in
+                RewardedAd.load(with: unit, request: req) { ad, error in
                     if let ad = ad { completion(.success(GmaFullScreen.rewarded(ad))) } else { completion(fail(error)) }
                 }
             case .rewardedInterstitial:
-                GADRewardedInterstitialAd.load(withAdUnitID: unit, request: req) { ad, error in
+                RewardedInterstitialAd.load(with: unit, request: req) { ad, error in
                     if let ad = ad { completion(.success(GmaFullScreen.rewardedInterstitial(ad))) } else { completion(fail(error)) }
                 }
             case .appOpen:
-                GADAppOpenAd.load(withAdUnitID: unit, request: req) { ad, error in
+                AppOpenAd.load(with: unit, request: req) { ad, error in
                     if let ad = ad { completion(.success(GmaFullScreen.appOpen(ad))) } else { completion(fail(error)) }
                 }
             case .banner, .native:
@@ -78,9 +83,9 @@ final class GmaEngine: NSObject, AdEngine {
     }
 }
 
-func gmaSource(_ info: GADResponseInfo?) -> String? { info?.loadedAdNetworkResponseInfo?.adSourceName }
+func gmaSource(_ info: ResponseInfo?) -> String? { info?.loadedAdNetworkResponseInfo?.adSourceName }
 
-func gmaPaid(_ v: GADAdValue) -> (Int64, String, String) {
+func gmaPaid(_ v: AdValue) -> (Int64, String, String) {
     let micros = v.value.multiplying(by: NSDecimalNumber(value: 1_000_000)).int64Value
     let prec: String
     switch v.precision {
@@ -93,40 +98,41 @@ func gmaPaid(_ v: GADAdValue) -> (Int64, String, String) {
 }
 
 /// A loaded full-screen ad of any of the four formats. It keeps itself alive from show() until the ad closes
-/// (Google holds its delegate weakly); destroy() lets go.
-final class GmaFullScreen: NSObject, GADFullScreenContentDelegate, EngineFullScreenAd {
+/// (Google holds its delegate weakly); destroy() lets go. The paid event arrives through the delegate (13.x).
+final class GmaFullScreen: NSObject, FullScreenContentDelegate, EngineFullScreenAd {
     let source: String?
     private var listener: FullScreenListener?
     private var presentBlock: ((UIViewController, GmaFullScreen) -> Void)?
+    private var ad: AnyObject?     // Google's ad, held until it closes
 
     private init(source: String?) { self.source = source }
 
-    static func interstitial(_ ad: GAMInterstitialAd) -> GmaFullScreen {
+    static func interstitial(_ ad: AdManagerInterstitialAd) -> GmaFullScreen {
         let w = GmaFullScreen(source: gmaSource(ad.responseInfo))
+        w.ad = ad
         ad.fullScreenContentDelegate = w
-        ad.paidEventHandler = { [weak w] v in w?.paid(v) }
-        w.presentBlock = { vc, _ in ad.present(fromRootViewController: vc) }
+        w.presentBlock = { vc, _ in ad.present(from: vc) }
         return w
     }
-    static func appOpen(_ ad: GADAppOpenAd) -> GmaFullScreen {
+    static func appOpen(_ ad: AppOpenAd) -> GmaFullScreen {
         let w = GmaFullScreen(source: gmaSource(ad.responseInfo))
+        w.ad = ad
         ad.fullScreenContentDelegate = w
-        ad.paidEventHandler = { [weak w] v in w?.paid(v) }
-        w.presentBlock = { vc, _ in ad.present(fromRootViewController: vc) }
+        w.presentBlock = { vc, _ in ad.present(from: vc) }
         return w
     }
-    static func rewarded(_ ad: GADRewardedAd) -> GmaFullScreen {
+    static func rewarded(_ ad: RewardedAd) -> GmaFullScreen {
         let w = GmaFullScreen(source: gmaSource(ad.responseInfo))
+        w.ad = ad
         ad.fullScreenContentDelegate = w
-        ad.paidEventHandler = { [weak w] v in w?.paid(v) }
-        w.presentBlock = { vc, me in ad.present(fromRootViewController: vc) { let r = ad.adReward; me.listener?.onReward(type: r.type, amount: r.amount.intValue) } }
+        w.presentBlock = { vc, me in ad.present(from: vc) { let r = ad.adReward; me.listener?.onReward(type: r.type, amount: r.amount.intValue) } }
         return w
     }
-    static func rewardedInterstitial(_ ad: GADRewardedInterstitialAd) -> GmaFullScreen {
+    static func rewardedInterstitial(_ ad: RewardedInterstitialAd) -> GmaFullScreen {
         let w = GmaFullScreen(source: gmaSource(ad.responseInfo))
+        w.ad = ad
         ad.fullScreenContentDelegate = w
-        ad.paidEventHandler = { [weak w] v in w?.paid(v) }
-        w.presentBlock = { vc, me in ad.present(fromRootViewController: vc) { let r = ad.adReward; me.listener?.onReward(type: r.type, amount: r.amount.intValue) } }
+        w.presentBlock = { vc, me in ad.present(from: vc) { let r = ad.adReward; me.listener?.onReward(type: r.type, amount: r.amount.intValue) } }
         return w
     }
 
@@ -139,45 +145,75 @@ final class GmaFullScreen: NSObject, GADFullScreenContentDelegate, EngineFullScr
         present(vc, self)
     }
 
-    func destroy() { listener = nil; presentBlock = nil }
+    func destroy() { listener = nil; presentBlock = nil; ad = nil }
 
-    private func paid(_ v: GADAdValue) { let p = gmaPaid(v); listener?.onPaid(valueMicros: p.0, currency: p.1, precision: p.2) }
-
-    // GADFullScreenContentDelegate
-    func adWillPresentFullScreenContent(_ ad: GADFullScreenPresentingAd) { listener?.onShown() }
-    func adDidRecordClick(_ ad: GADFullScreenPresentingAd) { listener?.onClicked() }
-    func adDidDismissFullScreenContent(_ ad: GADFullScreenPresentingAd) { listener?.onDismissed() }
-    func ad(_ ad: GADFullScreenPresentingAd, didFailToPresentFullScreenContentWithError error: Error) {
+    // FullScreenContentDelegate
+    func adWillPresentFullScreenContent(_ ad: FullScreenPresentingAd) { listener?.onShown() }
+    func adDidRecordImpression(_ ad: FullScreenPresentingAd) { listener?.onImpression() }
+    func adDidRecordClick(_ ad: FullScreenPresentingAd) { listener?.onClicked() }
+    func adDidDismissFullScreenContent(_ ad: FullScreenPresentingAd) { listener?.onDismissed() }
+    func ad(_ ad: FullScreenPresentingAd, didFailToPresentFullScreenContentWithError error: Error) {
         let ns = error as NSError
         listener?.onFailedToShow(code: ns.code, message: ns.localizedDescription)
     }
+    func ad(_ ad: FullScreenPresentingAd, didRecordPaidEventWith value: AdValue) {
+        let p = gmaPaid(value); listener?.onPaid(valueMicros: p.0, currency: p.1, precision: p.2)
+    }
 }
 
-/// A banner: Google's anchored adaptive size for the width given.
-final class GmaBanner: NSObject, EngineBanner, GADBannerViewDelegate {
-    private let banner: GAMBannerView
+/// A banner, asked for in sizes from the largest down (BannerLadder, as on Android): Google's large anchored adaptive
+/// size, the standard anchored adaptive one and 320x50 in one request; on "no fill" the standard size alone, then
+/// 320x50 alone, in the same load. The size that filled is kept for the banner's refreshes.
+final class GmaBanner: NSObject, EngineBanner, BannerViewDelegate {
+    private let banner: AdManagerBannerView
     private weak var listener: BannerListener?
+    private let width: CGFloat
+    private var tier = 0
+    private var good = -1
+    private var request: EngineRequest?
     var view: UIView { banner }
     var adSize: CGSize { banner.adSize.size }
 
     init(unit: String, width: CGFloat, root: UIViewController?, listener: BannerListener) {
-        banner = GAMBannerView(adSize: GADCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(width))
+        self.width = width
+        banner = AdManagerBannerView(adSize: largeAnchoredAdaptiveBanner(width: width))
         self.listener = listener
         super.init()
         banner.adUnitID = unit
         banner.rootViewController = root
         banner.delegate = self
-        banner.paidEventHandler = { [weak self] v in let p = gmaPaid(v); self?.listener?.onPaid(valueMicros: p.0, currency: p.1, precision: p.2) }
     }
 
-    func load(_ request: EngineRequest) { banner.load(GmaEngine.request(request)) }
-    func destroy() { banner.delegate = nil; banner.paidEventHandler = nil; banner.removeFromSuperview() }
+    private func sizes(_ t: Int) -> [AdSize] {
+        BannerLadder.tier(t, large: largeAnchoredAdaptiveBanner(width: width), standard: currentOrientationAnchoredAdaptiveBanner(width: width), small: AdSizeBanner)
+    }
 
-    func bannerViewDidReceiveAd(_ bannerView: GADBannerView) { listener?.onLoaded(source: gmaSource(bannerView.responseInfo)) }
-    func bannerView(_ bannerView: GADBannerView, didFailToReceiveAdWithError error: Error) {
+    private func ask() {
+        guard let r = request else { return }
+        let s = sizes(tier)
+        banner.adSize = s[0]
+        banner.validAdSizes = s.map { nsValue(for: $0) }
+        banner.load(GmaEngine.request(r))
+    }
+
+    func load(_ request: EngineRequest) {
+        self.request = request
+        tier = good >= 0 ? good : 0
+        ask()
+    }
+    func destroy() { banner.delegate = nil; request = nil; banner.removeFromSuperview() }
+
+    // BannerViewDelegate
+    func bannerViewDidReceiveAd(_ bannerView: BannerView) { good = tier; listener?.onLoaded(source: gmaSource(bannerView.responseInfo)) }
+    func bannerView(_ bannerView: BannerView, didFailToReceiveAdWithError error: Error) {
         let ns = error as NSError
+        if let next = BannerLadder.next(tier, code: ns.code), request != nil { tier = next; ask(); return }   // a smaller size, at once
+        good = -1
         listener?.onFailed(code: ns.code, message: ns.localizedDescription)
     }
-    func bannerViewDidRecordImpression(_ bannerView: GADBannerView) { listener?.onImpression() }
-    func bannerViewDidRecordClick(_ bannerView: GADBannerView) { listener?.onClicked() }
+    func bannerViewDidRecordImpression(_ bannerView: BannerView) { listener?.onImpression() }
+    func bannerViewDidRecordClick(_ bannerView: BannerView) { listener?.onClicked() }
+    func bannerView(_ bannerView: BannerView, didRecordPaidEventWith value: AdValue) {
+        let p = gmaPaid(value); listener?.onPaid(valueMicros: p.0, currency: p.1, precision: p.2)
+    }
 }

@@ -17,7 +17,7 @@ The SDK for iOS apps monetized with [VisionForgeX](https://apps.visionforgex.com
 ## Add it
 
 Xcode → File → Add Package Dependencies → `https://github.com/VisionForgeX/visionforgex-ios-sdk` → add the
-**VisionForgeX** library to your app target. It brings Google Mobile Ads 11 and Google's consent SDK; remove your own
+**VisionForgeX** library to your app target. It brings Google Mobile Ads 13 and Google's consent SDK; remove your own
 Google Mobile Ads package if you have one.
 
 `Info.plist`: the App ID shown on your app's page on VisionForgeX, and Google's SKAdNetwork identifiers (list on
@@ -78,5 +78,5 @@ VisionForgeX.revenueListener = { r in /* r.valueMicros, r.currency, r.precision 
 
 ## Status
 
-Version 1.1.0 is written against Google Mobile Ads 11.x and has not yet been through its first CI build.
+Version 1.2.0 is built on Google Mobile Ads 13.x (Xcode 16 or later); GitHub's Macs build and test it on every push.
 What stays private is the platform; this repository holds only what runs in the app.

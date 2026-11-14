@@ -7,17 +7,17 @@ on:
 jobs:
   core-tests:
     name: Core logic tests (macOS)
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - name: Test the core (runs the XCTest suite on an iPhone simulator, the platform the SDK is for)
         run: |
           set -o pipefail
           xcodebuild -list 2>&1 | tail -15
-          xcodebuild -scheme VisionForgeX-Package -destination 'platform=iOS Simulator,name=iPhone 15' -skipPackagePluginValidation test 2>&1 | tail -80
+          xcodebuild -scheme VisionForgeX-Package -destination 'platform=iOS Simulator,name=iPhone 16' -skipPackagePluginValidation test 2>&1 | tail -80
   ios-build:
     name: Build for iOS
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - name: Build the SDK for iOS
