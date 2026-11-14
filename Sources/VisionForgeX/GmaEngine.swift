@@ -149,7 +149,6 @@ final class GmaFullScreen: NSObject, FullScreenContentDelegate, EngineFullScreen
 
     // FullScreenContentDelegate
     func adWillPresentFullScreenContent(_ ad: FullScreenPresentingAd) { listener?.onShown() }
-    func adDidRecordImpression(_ ad: FullScreenPresentingAd) { listener?.onImpression() }
     func adDidRecordClick(_ ad: FullScreenPresentingAd) { listener?.onClicked() }
     func adDidDismissFullScreenContent(_ ad: FullScreenPresentingAd) { listener?.onDismissed() }
     func ad(_ ad: FullScreenPresentingAd, didFailToPresentFullScreenContentWithError error: Error) {
