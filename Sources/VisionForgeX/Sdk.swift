@@ -276,7 +276,7 @@ final class Sdk: SlotEnv {
         let machine = withUnsafePointer(to: &sys.machine) { $0.withMemoryRebound(to: CChar.self, capacity: 1) { String(cString: $0) } }
         let country = String((Locale.current.regionCode ?? "").prefix(2))
         return EventLog.Header(key: key, install: installId, session: sessionId, sdk: vfxVersion, appVersion: (info?["CFBundleShortVersionString"] as? String) ?? "",
-                               os: UIDevice.current.systemVersion, device: String(machine.prefix(60)), country: country, ab: cfg?.ab ?? "", sample: cfg?.sample ?? 1.0, engine: engine.name)
+                               os: UIDevice.current.systemVersion, device: String(machine.prefix(60)), country: country, ab: cfg?.ab ?? "", sample: cfg?.sample ?? 1.0, engine: adEngine.name)
     }
 
     func flushNow() {
