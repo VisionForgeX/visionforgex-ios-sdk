@@ -76,7 +76,13 @@ if VisionForgeX.isPrivacyOptionsRequired { VisionForgeX.showPrivacyOptions(from:
 VisionForgeX.revenueListener = { r in /* r.valueMicros, r.currency, r.precision → your analytics */ }
 ```
 
+Ad revenue in **AppsFlyer** (6.15 or newer) or **Adjust**: when VisionForgeX switches it on for the app, the SDK sends
+each impression's revenue to them itself (AppsFlyer `logAdRevenue` as Google AdMob mediation, with the serving network,
+ad unit, format and placement; Adjust `trackAdRevenue` with source `admob_sdk`). The app adds and starts the tool as
+its own guide says; VisionForgeX finds it and never sets it up. Not in the app: nothing is sent. Demo ads are never
+sent. Do not also forward Google's paid events to the same tool yourself, or each impression counts twice.
+
 ## Status
 
-Version 1.2.0 is built on Google Mobile Ads 13.x (Xcode 16 or later); GitHub's Macs build and test it on every push.
+Version 1.3.0 is built on Google Mobile Ads 13.x (Xcode 16 or later); GitHub's Macs build and test it on every push.
 What stays private is the platform; this repository holds only what runs in the app.

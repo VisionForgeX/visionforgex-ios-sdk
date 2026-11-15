@@ -68,6 +68,8 @@ public struct Config {
     public var ab: String
     public var placements: [String: Placement]
     public var prebid: PrebidSettings? = nil
+    /// Attribution tools each impression's revenue also goes to (PROTOCOL.md, "mmp"); none unless the platform says so.
+    public var mmp: Mmp = Mmp()
 }
 
 private func clamp(_ v: Int, _ lo: Int, _ hi: Int) -> Int { min(max(v, lo), hi) }
@@ -120,7 +122,8 @@ public enum ConfigParser {
             kv: kv,
             ab: matches(ab, "^e[0-9]{1,4}:[ab]$") ? ab : "",
             placements: pls,
-            prebid: prebid(o["prebid"] as? [String: Any]))
+            prebid: prebid(o["prebid"] as? [String: Any]),
+            mmp: Mmp(appsflyer: o.obj("mmp").bool("appsflyer", false), adjust: o.obj("mmp").bool("adjust", false)))
     }
 
     private static let storedId = "^[A-Za-z0-9_.-]{1,80}\\z"

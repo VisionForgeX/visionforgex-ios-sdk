@@ -20,6 +20,7 @@ final class Sdk: SlotEnv {
     private(set) var sessionId = ""
     private(set) var sessionNumber = 0
     private var cfg: Config?
+    private let revenueForwarder = RevenueForwarder()
     private(set) var configFrom = "none"
     private(set) var configAt: Int64 = 0
     private var engineStarted = false
@@ -215,6 +216,9 @@ final class Sdk: SlotEnv {
         eventListener?(VfxEvent(type: type, placement: p.name, format: p.format, details: clean, time: clock()))
         if type == "paid" {
             revenueListener?(VfxRevenue(placement: p.name, format: p.format, valueMicros: (clean["v"] as? Int64) ?? 0, currency: (clean["cur"] as? String) ?? "", precision: (clean["prec"] as? String) ?? "", source: clean["src"] as? String))
+        }
+        if type == "paid", let c = cfg, c.mmp.any, !c.test {   // demo ads earn nothing: never sent
+            revenueForwarder.forward(c.mmp, placement: p.name, format: p.format, unit: p.unit, micros: (clean["v"] as? Int64) ?? 0, currency: (clean["cur"] as? String) ?? "", source: clean["src"] as? String)
         }
         guard let c = cfg, c.eventsOn else { return }
         var f: [String: Any?] = ["pl": p.name, "f": p.format.wire]

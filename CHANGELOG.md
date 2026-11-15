@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.0 (not released yet)
+- **Ad revenue to AppsFlyer and Adjust** (off unless the platform's settings carry an `mmp` block): each impression's
+  revenue from Google's paid event goes to AppsFlyer (6.15+, `logAdRevenue`, mediation network Google AdMob, with the
+  serving network, ad unit, format and placement) and/or Adjust (`trackAdRevenue`, source `admob_sdk`, with the ad
+  unit and placement). Found in the app by name (`NSClassFromString`): the SDK links neither, an app without them is
+  unchanged, and one switched on but missing is said once in the log. Never in test mode, never a zero value.
+  Same behaviour as Android 1.3.0 (docs/PROTOCOL.md).
+
 ## 1.2.0 (15 Nov 2026)
 - **Google Mobile Ads 13.x** (was 11.x). Google deprecated 11.x on 4 Feb 2026 and stops serving it in Q2 2027; 13.x is
   supported until Q1 2028. Google's Swift names since 12.0 (`MobileAds.shared`, `AdManagerRequest`, `AdManagerBannerView`,
