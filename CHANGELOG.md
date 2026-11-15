@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.2.0 (not released)
+## 1.2.0 (15 Nov 2026)
 - **Google Mobile Ads 13.x** (was 11.x). Google deprecated 11.x on 4 Feb 2026 and stops serving it in Q2 2027; 13.x is
   supported until Q1 2028. Google's Swift names since 12.0 (`MobileAds.shared`, `AdManagerRequest`, `AdManagerBannerView`,
   `load(with:request:)`, `present(from:)`), the age treatment as one setting (CHILD or TEEN), paid events through the
